@@ -32,17 +32,23 @@ open class DisplaySwitchLayout: UICollectionViewLayout {
         let insets = collectionView!.contentInset
         return collectionView!.bounds.width - insets.left - insets.right
     }
+    fileprivate let footerExists: Bool
     
     // MARK: - Lifecycle
   
-    public init(staticCellHeight: CGFloat, nextLayoutStaticCellHeight: CGFloat, layoutState: LayoutState,
-                cellPadding: CGPoint = CGPoint(x: 6, y: 6), gridLayoutCountOfColumns: Int = 3) {
+    public init(staticCellHeight: CGFloat,
+                nextLayoutStaticCellHeight: CGFloat,
+                layoutState: LayoutState,
+                cellPadding: CGPoint = CGPoint(x: 6, y: 6),
+                gridLayoutCountOfColumns: Int = 3,
+                footerExists: Bool = false) {
         self.staticCellHeight = staticCellHeight
         self.gridLayoutCountOfColumns = gridLayoutCountOfColumns
         self.numberOfColumns = layoutState == .list ? listLayoutCountOfColumns : gridLayoutCountOfColumns
         self.layoutState = layoutState
         self.nextLayoutStaticCellHeight = nextLayoutStaticCellHeight
         self.cellPadding = cellPadding
+        self.footerExists = footerExists
         
         super.init()
     }
@@ -61,24 +67,31 @@ open class DisplaySwitchLayout: UICollectionViewLayout {
         // cells layout
         contentHeight = 0
         let columnWidth = contentWidth / CGFloat(numberOfColumns)
-        var xOffsets = [CGFloat]()
-        for column in 0 ..< numberOfColumns {
-            xOffsets.append(CGFloat(column) * columnWidth)
-        }
+        let xOffsets = (0 ..< numberOfColumns).map { CGFloat($0) * columnWidth }
+        var yOffsets = [CGFloat](repeating: contentHeight, count: numberOfColumns)
         var column = 0
-        var yOffset = [CGFloat](repeating: contentHeight, count: numberOfColumns)
+        let height = cellPadding.y + staticCellHeight
         for item in 0 ..< collectionView!.numberOfItems(inSection: 0) {
             let indexPath = IndexPath(item: item, section: 0)
-            let height = cellPadding.y + staticCellHeight
-            let frame = CGRect(x: xOffsets[column], y: yOffset[column], width: columnWidth, height: height)
-            let insetFrame = frame.insetBy(dx: cellPadding.x, dy: cellPadding.y)
+            let frame = CGRect(x: xOffsets[column], y: yOffsets[column], width: columnWidth, height: height)
             let attributes = DisplaySwitchLayoutAttributes(forCellWith: indexPath)
-            attributes.frame = insetFrame
+            attributes.frame = frame.insetBy(dx: cellPadding.x, dy: cellPadding.y)
             baseLayoutAttributes.append(attributes)
             contentHeight = max(contentHeight, frame.maxY)
-            yOffset[column] = yOffset[column] + height
+            yOffsets[column] = yOffsets[column] + height
             column = column == (numberOfColumns - 1) ? 0 : column + 1
         }
+        
+        //footer layout
+        if !footerExists { return }
+        let sectionFooterAttributes = DisplaySwitchLayoutAttributes(
+            forSupplementaryViewOfKind: UICollectionElementKindSectionFooter,
+            with: IndexPath(item: collectionView!.numberOfItems(inSection: 0) + 1, section: 0))
+
+        sectionFooterAttributes.frame = CGRect(x: xOffsets[column], y: yOffsets[column], width: collectionView!.frame.width , height: 50)
+
+        contentHeight = max(contentHeight, sectionFooterAttributes.frame.maxY)
+        baseLayoutAttributes.append(sectionFooterAttributes)
     }
     
     override open var collectionViewContentSize: CGSize {
